@@ -1,0 +1,147 @@
+#Analyzes the addition of an ionic solution, with concentration ratio as a function of transmembrane voltage
+
+#Packages
+install.packages('openxlsx')
+library(openxlsx)
+
+#Fit Params 
+m = c(3562.516113281250000,
+      3590.127441406250000,
+      3600.306640625000000,
+      3712.709960937500000,
+      3732.576660156250000,
+      3731.293701171875000,
+      3820.237792968750000,
+      3852.013183593750000,
+      3845.812255859375000,
+      3988.020019531250000,
+      4019.768798828125000,
+      4024.122070312500000,
+      4188.294921875000000,
+      4255.395996093750000,
+      4254.557617187500000,
+      4388.462890625000000,
+      4446.742675781250000,
+      4451.570312500000000,
+      4640.255371093750000,
+      4715.610351562500000,
+      4723.199218750000000,
+      4836.330566406250000,
+      4916.623535156250000,
+      4925.232910156250000,
+      4979.707031250000000,
+      5082.304199218750000,
+      5078.818359375000000,
+      5238.985839843750000,
+      5331.898925781250000,
+      5332.866210937500000)
+
+b = c(288.198486328125000,
+           -12.914110183715820,
+           -51.977092742919922,
+           -13809.307617187500000,
+           -13982.336914062500000,
+           -14051.333007812500000,
+           -26309.888671875000000,
+           -26807.757812500000000,
+           -26819.501953125000000,
+           -43085.179687500000000,
+           -43560.726562500000000,
+           -43651.515625000000000,
+           -58923.730468750000000,
+           -60638.625000000000000,
+           -60674.781250000000000,
+           -77544.140625000000000,
+           -79074.164062500000000,
+           -79241.062500000000000,
+           -100677.234375000000000,
+           -103075.890625000000000,
+           -103272.906250000000000,
+           -121667.203125000000000,
+           -124406.835937500000000,
+           -124657.929687500000000,
+           -140681.671875000000000,
+           -144315.062500000000000,
+           -144234.421875000000000,
+           -164280.828125000000000,
+           -168029.625000000000000,
+           -168128.031250000000000) 
+
+#concentration of ionic solution added each time in millimolar
+concentration <- 1000
+
+#volume added in each instance 
+  #rep(m, n) means the value m, was added n time
+  #Must be in order of addition
+  #If two different sets of sweeps for one addition in intercept data, second set of sweeps has value of 0 for volume. 
+volumes <- c(0, 10, 10, 10, 10, 15, 15, 15, 15, 20) 
+
+#original volume before additions in micromolar
+startingVolume <- 1000
+
+#original concentration in milliMolar 
+startingConcentration <- 50
+
+#number of sweeps
+numSweeps <- 3
+
+
+
+#Voltage calculations
+intercepts = -b/m
+voltData<- data.frame( 'Av Volt' = NA, 'StanDev' = NA)
+
+for ( i in c(seq(from = 1, to = length(intercepts), by = numSweeps))) {
+  sweepValues <- c(intercepts[i:(i+ numSweeps -1)])
+  if (i != 1) {
+    voltData[nrow(voltData) + 1, ] = c(-sum(sweepValues)/numSweeps, sd(sweepValues))
+  }
+  else {
+    voltData[1, ] = c(-sum(sweepValues)/numSweeps, sd(sweepValues))
+  }
+  
+}
+
+#Concentration calculations
+#In microliters and millimolar
+
+concData <- data.frame('StartConc' = startingConcentration, 'AddConc' = concentration, 'StartVol' = startingVolume, 'AddVol' = volumes, 'EndVol' = startingVolume, 
+                       'EndConc' = 0, 'ConcRatio' = 1) 
+for (i in 1:length(voltData[, 1])) {
+  concData$EndVol[i] <- concData$StartVol[i] + concData$AddVol[i] 
+  concData$EndConc[i] <- (concData$StartConc[i] * concData$StartVol[i] + concData$AddConc[i] * concData$AddVol[i])/concData$EndVol[i]
+  concData$ConcRatio[i] <- concData$EndConc[i]/concData$StartConc[1]
+  if (i != length(voltData[, 1])) {
+  concData$StartVol[i+1] <- concData$EndVol[i]
+  concData$StartConc[i+1] <- concData$EndConc[i] 
+  }
+}
+
+
+#Graph and save graph to computer
+plot(concData$ConcRatio, voltData$Av.Volt, xlab = 'Concentration Ratio', ylab =  'Transmembrane Voltage', main= '2021_03_15-Mid-Li')
+arrows(concData$ConcRatio, voltData$Av.Volt + voltData$StanDev, concData$ConcRatio, voltData$Av.Volt - voltData$StanDev, angle=90, length=0.001, lwd=1.5)
+
+pdf(file = '2021_03_15-Mid-Li  Graph', height = 6, width = 6)
+plot(concData$ConcRatio, voltData$Av.Volt, xlab = 'Concentration Ratio', ylab =  'Transmembrane Voltage', main= '2021_03_15-Mid-Li')
+arrows(concData$ConcRatio, voltData$Av.Volt + voltData$StanDev, concData$ConcRatio, voltData$Av.Volt - voltData$StanDev, angle=90, length=0.001, lwd=1.5)
+dev.off()
+
+
+
+
+#Return Necessary information as excel file
+toReturn <- data.frame('Average Voltage' = voltData$Av.Volt, 'Standard Deviation of Voltage' = voltData$StanDev, 'Concentration Ratio' = concData$ConcRatio)
+wb <- createWorkbook(
+  creator = "Ilinca",
+  title = "2021_03_15-Mid-Li ")
+sheet <- addWorksheet(wb, "2021_03_15-Mid-Li ")
+writeData(wb, sheet, toReturn)
+setColWidths(wb, sheet, 1:3, widths = 50)
+
+saveWorkbook(wb, file = "2021_03_15-Mid-Li ", overwrite = TRUE)
+print(toReturn)
+
+
+
+
